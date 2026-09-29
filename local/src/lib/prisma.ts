@@ -1,6 +1,5 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
-import { isCloudflareDeployment } from "./cloudflare-bindings";
 
 type HyperdriveBinding = { connectionString?: string };
 type CloudflareEnvironment = { HYPERDRIVE?: HyperdriveBinding };
@@ -9,7 +8,6 @@ const LOCAL_DEVELOPMENT_DATABASE_URL =
   "postgresql://subboost_local_dev:subboost_local_dev_password@localhost:5432/subboost_local_dev?schema=public";
 
 const globalForPrisma = globalThis as unknown as {
-  localPrisma?: PrismaClient;
   localPrismaByUrl?: Map<string, PrismaClient>;
 };
 
@@ -92,24 +90,15 @@ function createPrismaProxy(): PrismaClient {
   });
 }
 
-function createNodePrismaClient(): PrismaClient {
-  if (process.env.NODE_ENV !== "production" && globalForPrisma.localPrisma) {
-    return globalForPrisma.localPrisma;
-  }
-  const connectionString = process.env.DATABASE_URL?.trim() || LOCAL_DEVELOPMENT_DATABASE_URL;
-  const client = createClient(connectionString);
-  if (process.env.NODE_ENV !== "production") globalForPrisma.localPrisma = client;
-  return client;
-}
-
 /**
  * In a Worker the binding is request context, so this proxy resolves the Prisma
- * client after the request starts. Node.js tools get the same API backed by
- * DATABASE_URL and reuse the client for the process lifetime.
+ * client after the request starts. This also avoids reading Worker bindings
+ * while the module is being initialized, before a request context exists.
+ * Node.js tools use DATABASE_URL and reuse the client by connection string.
  */
-const cloudflareDeployment = isCloudflareDeployment();
-export const prisma = cloudflareDeployment ? createPrismaProxy() : createNodePrismaClient();
+export const prisma = createPrismaProxy();
 
 export async function getPrisma(): Promise<PrismaClient> {
-  return cloudflareDeployment ? getPrismaClient() : prisma;
+  return getPrismaClient();
 }
+
