@@ -57,6 +57,7 @@ vi.mock("@subboost/core/templates/config-template", () => ({
 vi.mock("../../../local/src/lib/crypto", () => ({
   decryptJsonObject: mocks.decryptJsonObject,
   encryptJson: mocks.encryptJson,
+  encryptText: (value: string) => value,
 }));
 vi.mock("../../../local/src/lib/prisma", () => ({ prisma: mocks.prisma }));
 vi.mock("../../../local/src/lib/subscription-service", () => ({
@@ -166,7 +167,8 @@ describe("public local services remaining branch coverage", () => {
     });
     mocks.prepareRefreshCacheResult.mockReturnValue({
       ok: true,
-      cacheEntry: { nodes: [], subscriptionInfo: {} },
+      cacheEntry: { nodes: [], subscriptionInfo: {}, generatedYaml: "mixed-port: 7890\n" },
+      generatedYaml: "mixed-port: 7890\n",
       nodeCount: 0,
     });
     mocks.resolveAutomaticRefreshCompletionDecision.mockReturnValue({
