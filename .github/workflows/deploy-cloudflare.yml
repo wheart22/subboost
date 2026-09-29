@@ -41,6 +41,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Generate Prisma Client
+        run: npm --workspace @subboost/local run db:generate
       - name: Apply database migrations
         run: npm --workspace @subboost/local run db:migrate
       - name: Create the single owner record
