@@ -4,7 +4,7 @@
   "name": "subboost-management",
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-09-29",
-  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "compatibility_flags": ["nodejs_compat", "nodejs_compat_populate_process_env", "global_fetch_strictly_public"],
   "workers_dev": true,
   "preview_urls": false,
   "assets": {
