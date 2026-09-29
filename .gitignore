@@ -2,6 +2,12 @@ node_modules/
 **/node_modules/
 .next/
 local/.next/
+local/.open-next/
+local/.wrangler/
+.npm-cache/
+local/wrangler.jsonc
+cloudflare/config-worker/wrangler.jsonc
+cloudflare/config-worker/.wrangler/
 out/
 dist/
 coverage/

@@ -19,6 +19,7 @@ import {
   type SubscriptionAutoUpdateStateFields,
 } from "@subboost/server-core/subscription";
 import { encryptJson } from "./crypto";
+import { encryptGeneratedYaml } from "./cloudflare-config-snapshots";
 import { prisma } from "./prisma";
 import {
   buildSubscriptionCacheExpiry,
@@ -178,6 +179,7 @@ async function completeSuccess(params: {
   if (!refreshResult.ok) throw new Error(`Unexpected refresh failure reason: ${refreshResult.reason}`);
 
   const cachedAt = new Date();
+  const generatedYamlSnapshot = encryptGeneratedYaml(refreshResult.generatedYaml);
   const decision = resolveAutomaticRefreshCompletionDecision({
     target: toCompletionTarget(params.subscription),
     currentAutoUpdateState: resolveSubscriptionAutoUpdateState(params.subscription),
@@ -195,6 +197,9 @@ async function completeSuccess(params: {
       encryptedNodes: encryptJson(refreshResult.cacheEntry.nodes),
       encryptedConfig: encryptJson(refreshResult.refreshedConfig),
       encryptedSubscriptionInfo: encryptJson(refreshResult.cacheEntry.subscriptionInfo),
+      encryptedGeneratedYaml: generatedYamlSnapshot.encryptedYaml,
+      generatedYamlSha256: generatedYamlSnapshot.sha256,
+      generatedYamlUpdatedAt: cachedAt,
       lastUpdatedAt: cachedAt,
       cacheExpiresAt: buildSubscriptionCacheExpiry(cachedAt),
       ...(decision.nextAutoUpdateState.shouldDisableAutoUpdate ? { autoUpdateInterval: null } : {}),

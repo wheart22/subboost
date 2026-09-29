@@ -5,6 +5,7 @@ import {
 } from "@subboost/server-core/session-revocation";
 import { cookies } from "next/headers";
 import { jwtVerify, SignJWT } from "jose";
+import { isCloudflareDeployment } from "./cloudflare-bindings";
 import { isHttpsAppUrl, requireEnv } from "./env";
 import { prisma } from "./prisma";
 
@@ -30,6 +31,13 @@ export class SessionRevocationStoreUnavailableError extends Error {
 }
 
 function key(): Uint8Array {
+  if (isCloudflareDeployment()) {
+    const appPassword = process.env.APP_PASSWORD;
+    if (!appPassword) throw new Error("APP_PASSWORD is required");
+    return new TextEncoder().encode(`subboost-cloudflare-session-v1:${requireEnv("ENCRYPTION_KEY")}:${appPassword}`);
+  }
+  const jwtSecret = process.env.JWT_SECRET?.trim();
+  if (jwtSecret) return new TextEncoder().encode(jwtSecret);
   return new TextEncoder().encode(requireEnv("JWT_SECRET"));
 }
 
@@ -126,7 +134,7 @@ export function sessionCookieOptions() {
   return {
     httpOnly: true,
     sameSite: "lax" as const,
-    secure: isHttpsAppUrl(),
+    secure: isCloudflareDeployment() || isHttpsAppUrl(),
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
   };
@@ -136,7 +144,7 @@ export function clearSessionCookieOptions() {
   return {
     httpOnly: true,
     sameSite: "lax" as const,
-    secure: isHttpsAppUrl(),
+    secure: isCloudflareDeployment() || isHttpsAppUrl(),
     path: "/",
     maxAge: 0,
   };

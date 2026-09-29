@@ -18,6 +18,7 @@ vi.mock("@local/lib/crypto", () => ({
     ciphertext ? JSON.parse(ciphertext.replace(/^json:/, "")) : {}
   ),
   encryptJson: vi.fn((value: unknown) => `encrypted:${JSON.stringify(value)}`),
+  encryptText: vi.fn((value: string) => value),
 }));
 
 vi.mock("@local/lib/prisma", () => ({

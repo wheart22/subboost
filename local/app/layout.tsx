@@ -6,6 +6,7 @@ import { ScrollLockStabilizer } from "@subboost/ui/components/layout/scroll-lock
 import { ConfirmDialogHost } from "@subboost/ui/components/ui/confirm-dialog";
 import { Toaster } from "@subboost/ui/components/ui/toaster";
 import { LocalHeader } from "@local/components/local-header";
+import { CloudflareAuthGate } from "@local/components/cloudflare-auth-gate";
 import { resolveAppVersionInfo } from "@subboost/server-core/app-version";
 import {
   SUBBOOST_FAVICON_PATH,
@@ -44,15 +45,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="zh-CN" className="dark">
       <body className="font-sans">
-        <ScrollLockStabilizer />
-        <div className="min-h-screen bg-gradient-radial flex flex-col">
-          <LocalHeader />
-          <main className="flex-1 pb-16 md:pb-0">{children}</main>
-          <Footer mode="local" buildVersion={buildVersion} />
-          <MobileNav mode="local" />
-        </div>
-        <Toaster />
-        <ConfirmDialogHost />
+        <CloudflareAuthGate>
+          <ScrollLockStabilizer />
+          <div className="min-h-screen bg-gradient-radial flex flex-col">
+            <LocalHeader />
+            <main className="flex-1 pb-16 md:pb-0">{children}</main>
+            <Footer mode="local" buildVersion={buildVersion} />
+            <MobileNav mode="local" />
+          </div>
+          <Toaster />
+          <ConfirmDialogHost />
+        </CloudflareAuthGate>
       </body>
     </html>
   );

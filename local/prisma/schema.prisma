@@ -1,6 +1,5 @@
 generator client {
   provider = "prisma-client-js"
-  output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -44,6 +43,9 @@ model Subscription {
   encryptedUrls                 String    @db.Text
   encryptedNodes                String    @db.Text
   encryptedConfig               String    @db.Text
+  encryptedGeneratedYaml        String?   @db.Text
+  generatedYamlUpdatedAt        DateTime?
+  generatedYamlSha256           String?
   encryptedSubscriptionInfo     String?   @db.Text
   autoUpdateInterval            Int?
   cacheExpiresAt                DateTime?
@@ -86,7 +88,6 @@ model JobLeaseLock {
 
   @@index([expiresAt])
 }
-
 model RevokedSession {
   revocationKey String   @id
   expiresAt     DateTime

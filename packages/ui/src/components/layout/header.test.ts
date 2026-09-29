@@ -121,7 +121,11 @@ describe("Header", () => {
     expect(html).toContain("FAQ");
     expect(html).not.toContain("我的订阅");
     expect(html).toContain("menu-icon");
-    expect(mocks.userMenuProps[0]).toEqual({ privilegedMenuItem: undefined });
+    expect(mocks.userMenuProps[0]).toEqual({
+      privilegedMenuItem: undefined,
+      allowLogin: true,
+      allowLogout: true,
+    });
   });
 
   it("renders local navigation without default-only privileged links", () => {

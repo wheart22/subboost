@@ -1,11 +1,11 @@
-type RequiredEnvName = "DATABASE_URL" | "ENCRYPTION_KEY" | "JWT_SECRET" | "APP_URL";
+type RequiredEnvName = "DATABASE_URL" | "ENCRYPTION_KEY" | "APP_URL" | "JWT_SECRET";
 
 const LOCAL_DEVELOPMENT_DEFAULTS: Record<RequiredEnvName, string> = {
   DATABASE_URL:
     "postgresql://subboost_local_dev:subboost_local_dev_password@localhost:5432/subboost_local_dev?schema=public",
   ENCRYPTION_KEY: "subboost-local-dev-encryption-key-0001",
-  JWT_SECRET: "subboost-local-dev-jwt-secret-00000001",
   APP_URL: "http://127.0.0.1:3001",
+  JWT_SECRET: "subboost-local-dev-jwt-secret-00000001",
 };
 
 export function requireEnv(name: RequiredEnvName): string {

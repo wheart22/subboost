@@ -8,10 +8,11 @@ const mocks = vi.hoisted(() => ({
 async function loadPrismaModule(env: { DATABASE_URL?: string; NODE_ENV?: string }, existing?: unknown) {
   vi.resetModules();
   vi.doMock("@prisma/adapter-pg", () => ({ PrismaPg: mocks.PrismaPg }));
-  vi.doMock("../generated/prisma", () => ({ PrismaClient: mocks.PrismaClient }));
+  vi.doMock("@prisma/client", () => ({ PrismaClient: mocks.PrismaClient }));
 
   vi.stubEnv("DATABASE_URL", env.DATABASE_URL);
   vi.stubEnv("NODE_ENV", env.NODE_ENV);
+  vi.stubEnv("SUBBOOST_CLOUDFLARE", "false");
   if (existing === undefined) {
     delete (globalThis as { localPrisma?: unknown }).localPrisma;
   } else {
@@ -41,7 +42,7 @@ describe("local prisma singleton", () => {
     vi.unstubAllEnvs();
     delete (globalThis as { localPrisma?: unknown }).localPrisma;
     vi.doUnmock("@prisma/adapter-pg");
-    vi.doUnmock("../generated/prisma");
+    vi.doUnmock("@prisma/client");
   });
 
   it("creates a development client with a trimmed configured database URL", async () => {

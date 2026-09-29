@@ -1,0 +1,15 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "account_id": "__CLOUDFLARE_ACCOUNT_ID__",
+  "name": "subboost-config",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-29",
+  "compatibility_flags": ["global_fetch_strictly_public"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  "vars": { "SUBBOOST_CLOUDFLARE": "true" },
+  "kv_namespaces": [
+    { "binding": "CONFIG_KV", "id": "__CONFIG_KV_NAMESPACE_ID__" }
+  ]
+}

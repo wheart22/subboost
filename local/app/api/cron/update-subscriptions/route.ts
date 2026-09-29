@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { json } from "@local/lib/http";
 import { requireLocalCronAuth } from "@local/lib/cron-auth";
 import { runLocalSubscriptionAutoUpdateCron } from "@local/lib/auto-update-service";
+import { isCloudflareDeployment } from "@local/lib/cloudflare-bindings";
 import {
   acquireLocalJobLease,
   JobLeaseLostError,
@@ -15,6 +16,8 @@ const LEASE_MS = 5 * 60 * 1000;
 const HEARTBEAT_MS = 60 * 1000;
 
 export async function POST(request: NextRequest) {
+  if (isCloudflareDeployment()) return new Response("Not found", { status: 404 });
+
   const authError = requireLocalCronAuth(request);
   if (authError) return authError;
 

@@ -87,7 +87,7 @@ export default function SettingsPage() {
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold mb-1">账户设置</h1>
-          <p className="text-white/50">本地管理员、订阅源安全和运行端点</p>
+          <p className="text-white/50">管理账户、订阅源安全和运行端点</p>
         </div>
       </div>
 
@@ -97,7 +97,7 @@ export default function SettingsPage() {
             <div className="rounded-lg bg-indigo-500/20 p-2 text-indigo-300">
               <ShieldCheck className="h-5 w-5" />
             </div>
-            <CardTitle className="text-base">本地管理员</CardTitle>
+            <CardTitle className="text-base">管理账户</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>

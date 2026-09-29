@@ -21,6 +21,13 @@ import {
   type RefreshNodeSnapshotResult,
 } from "@subboost/server-core/subscription";
 import { decryptJson, decryptJsonObject, encryptJson } from "./crypto";
+import {
+  deleteConfigSnapshotFromWorkerKv,
+  encryptGeneratedYaml,
+  readDecryptedGeneratedYaml,
+  validateGeneratedYaml,
+  writeConfigSnapshotToWorkerKv,
+} from "./cloudflare-config-snapshots";
 import { getAppUrl } from "./env";
 import { prisma } from "./prisma";
 import { fetchSourceUserInfoHeadersDirect, importSourceUrlDirect } from "./source-import";
@@ -38,6 +45,9 @@ export type SubscriptionRow = {
   encryptedUrls: string;
   encryptedNodes: string;
   encryptedConfig: string;
+  encryptedGeneratedYaml?: string | null;
+  generatedYamlUpdatedAt?: Date | null;
+  generatedYamlSha256?: string | null;
   encryptedSubscriptionInfo: string | null;
   autoUpdateInterval: number | null;
   cacheExpiresAt: Date | null;
@@ -119,7 +129,39 @@ function validateLocalSubscriptionNodes(value: unknown): ParsedNode[] {
 }
 
 function buildLocalSubscriptionUrl(token: string): string {
+  const subscriptionBaseUrl = process.env.SUBSCRIPTION_BASE_URL?.trim().replace(/\/+$/, "");
+  if (subscriptionBaseUrl) return `${subscriptionBaseUrl}/subscriptions/${token}/config.yaml`;
   return `${getAppUrl()}/api/subscriptions/${token}/config.yaml`;
+}
+
+export function generateLocalSubscriptionYaml(config: Record<string, unknown>, nodes: ParsedNode[]): string {
+  const { testUrl, testInterval } = getEffectiveTestOptions(config);
+  const proxyProviders = buildProxyProvidersFromConfig(config, { testUrl, testInterval });
+  return generateClashYaml(buildGenerateOptionsFromConfig(config, { nodes, proxyProviders }));
+}
+
+async function syncGeneratedSnapshotToKv(
+  row: Pick<SubscriptionRow, "token" | "name" | "autoUpdateInterval" | "encryptedSubscriptionInfo"> & {
+    encryptedGeneratedYaml?: string | null;
+    generatedYamlUpdatedAt?: Date | null;
+    generatedYamlSha256?: string | null;
+  }
+): Promise<void> {
+  if (!row.encryptedGeneratedYaml) return;
+  const generatedYaml = readDecryptedGeneratedYaml(row.encryptedGeneratedYaml);
+  if (!generatedYaml) return;
+  const encrypted = row.generatedYamlSha256
+    ? { encryptedYaml: row.encryptedGeneratedYaml, sha256: row.generatedYamlSha256 }
+    : encryptGeneratedYaml(generatedYaml);
+  await writeConfigSnapshotToWorkerKv({
+    token: row.token,
+    encryptedYaml: encrypted.encryptedYaml,
+    generatedAt: row.generatedYamlUpdatedAt ?? new Date(),
+    sha256: encrypted.sha256,
+    name: row.name,
+    subscriptionInfo: decryptJson(row.encryptedSubscriptionInfo, {}),
+    autoUpdateIntervalSeconds: row.autoUpdateInterval,
+  });
 }
 
 function buildLocalSubscriptionConfig(
@@ -219,6 +261,9 @@ export async function createSubscription(ownerId: string, body: unknown): Promis
   assertNodeNameFilterKeepsOutput(nodes, config);
   const autoUpdateInterval = normalizeLocalAutoUpdateIntervalSeconds(body.autoUpdateInterval);
   const subscriptionInfo = normalizeSubscriptionInfoForPersistence(body.subscriptionInfo) ?? {};
+  const generatedYaml = validateGeneratedYaml(body.generatedYaml);
+  const generatedYamlSnapshot = encryptGeneratedYaml(generatedYaml);
+  const generatedYamlUpdatedAt = new Date();
 
   const row = await prisma.subscription.create({
     data: {
@@ -228,11 +273,15 @@ export async function createSubscription(ownerId: string, body: unknown): Promis
       encryptedUrls: encryptJson(urls),
       encryptedNodes: encryptJson(nodes),
       encryptedConfig: encryptJson(config),
+      encryptedGeneratedYaml: generatedYamlSnapshot.encryptedYaml,
+      generatedYamlUpdatedAt,
+      generatedYamlSha256: generatedYamlSnapshot.sha256,
       encryptedSubscriptionInfo: encryptJson(subscriptionInfo),
       autoUpdateInterval,
     },
     include: { autoUpdateState: true },
   });
+  await syncGeneratedSnapshotToKv(row);
   return formatSubscription(row);
 }
 
@@ -262,6 +311,13 @@ export async function updateSubscription(ownerId: string, id: string, body: unkn
   }
   if ("subscriptionInfo" in body) {
     data.encryptedSubscriptionInfo = encryptJson(normalizeSubscriptionInfoForPersistence(body.subscriptionInfo) ?? {});
+  }
+  if ("generatedYaml" in body) {
+    const generatedYaml = validateGeneratedYaml(body.generatedYaml);
+    const generatedYamlSnapshot = encryptGeneratedYaml(generatedYaml);
+    data.encryptedGeneratedYaml = generatedYamlSnapshot.encryptedYaml;
+    data.generatedYamlUpdatedAt = new Date();
+    data.generatedYamlSha256 = generatedYamlSnapshot.sha256;
   }
 
   if (hasUrls || hasNodes || hasConfig) {
@@ -293,6 +349,7 @@ export async function updateSubscription(ownerId: string, id: string, body: unkn
       include: { autoUpdateState: true },
     });
   });
+  await syncGeneratedSnapshotToKv(row);
   return formatSubscription(row);
 }
 
@@ -305,8 +362,9 @@ export async function getSubscription(ownerId: string, id: string): Promise<Subs
 }
 
 export async function deleteSubscription(ownerId: string, id: string): Promise<boolean> {
-  const row = await prisma.subscription.findFirst({ where: { id, ownerId }, select: { id: true } });
+  const row = await prisma.subscription.findFirst({ where: { id, ownerId }, select: { id: true, token: true } });
   if (!row) return false;
+  await deleteConfigSnapshotFromWorkerKv(row.token);
   await prisma.subscription.delete({ where: { id: row.id } });
   return true;
 }
@@ -353,6 +411,8 @@ async function persistRefreshSuccess(params: {
   config: Record<string, unknown>;
   cachedAt: Date;
 }): Promise<boolean> {
+  const generatedYaml = generateLocalSubscriptionYaml(params.config, params.snapshot.nodes);
+  const generatedSnapshot = encryptGeneratedYaml(generatedYaml);
   return prisma.$transaction(async (tx) => {
     const updated = await tx.subscription.updateMany({
       where: { id: params.subscriptionId, updatedAt: params.expectedUpdatedAt },
@@ -360,6 +420,9 @@ async function persistRefreshSuccess(params: {
         encryptedNodes: encryptJson(params.snapshot.nodes),
         encryptedConfig: encryptJson(params.config),
         encryptedSubscriptionInfo: encryptJson(params.snapshot.subscriptionInfo),
+        encryptedGeneratedYaml: generatedSnapshot.encryptedYaml,
+        generatedYamlSha256: generatedSnapshot.sha256,
+        generatedYamlUpdatedAt: params.cachedAt,
         lastUpdatedAt: params.cachedAt,
         cacheExpiresAt: buildSubscriptionCacheExpiry(params.cachedAt),
         updatedAt: params.cachedAt,
@@ -419,6 +482,17 @@ export async function refreshSubscription(ownerId: string, id: string) {
       },
     };
   }
+  const refreshedYaml = generateLocalSubscriptionYaml(refreshResult.refreshedConfig, snapshot.nodes);
+  const generatedSnapshot = encryptGeneratedYaml(refreshedYaml);
+  await writeConfigSnapshotToWorkerKv({
+    token: row.token,
+    encryptedYaml: generatedSnapshot.encryptedYaml,
+    generatedAt: cachedAt,
+    sha256: generatedSnapshot.sha256,
+    name: row.name,
+    subscriptionInfo: snapshot.subscriptionInfo,
+    autoUpdateIntervalSeconds: row.autoUpdateInterval,
+  });
   return {
     ok: true as const,
     body: buildManualRefreshSuccessResponseBody({
@@ -437,12 +511,8 @@ export async function generateSubscriptionYaml(token: string): Promise<Generated
   const { testUrl, testInterval } = getEffectiveTestOptions(secrets.config);
   const proxyProviders = buildProxyProvidersFromConfig(secrets.config, { testUrl, testInterval });
   if (secrets.nodes.length === 0 && !proxyProviders) return null;
-  const yaml = generateClashYaml(
-    buildGenerateOptionsFromConfig(secrets.config, {
-      nodes: secrets.nodes,
-      proxyProviders,
-    })
-  );
+  const yaml = readDecryptedGeneratedYaml(row.encryptedGeneratedYaml)
+    ?? generateLocalSubscriptionYaml(secrets.config, secrets.nodes);
   await prisma.subscription.update({ where: { id: row.id }, data: { lastAccessedAt: new Date() } });
   return {
     yaml,

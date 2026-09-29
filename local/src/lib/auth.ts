@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { isCloudflareDeployment } from "./cloudflare-bindings";
 import { readSession } from "./session";
 
 export type CurrentAdmin = {
@@ -6,17 +7,26 @@ export type CurrentAdmin = {
   username: string;
 };
 
+/** The Cloudflare management Worker uses one owner and a password-backed session. */
 export async function getCurrentAdmin(): Promise<CurrentAdmin | null> {
+  if (isCloudflareDeployment()) {
+    const session = await readSession();
+    if (!session) return null;
+    return prisma.localAdmin.findFirst({
+      where: { id: session.adminId },
+      select: { id: true, username: true },
+    });
+  }
+
   const session = await readSession();
   if (!session) return null;
-  const admin = await prisma.localAdmin.findUnique({
+  return prisma.localAdmin.findUnique({
     where: { id: session.adminId },
     select: { id: true, username: true },
   });
-  return admin;
 }
 
 export async function isSetupRequired(): Promise<boolean> {
-  const count = await prisma.localAdmin.count();
-  return count === 0;
+  if (isCloudflareDeployment()) return false;
+  return (await prisma.localAdmin.count()) === 0;
 }

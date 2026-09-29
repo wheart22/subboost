@@ -44,7 +44,10 @@ vi.mock("@subboost/server-core/subscription", () => ({
   resolveAutoUpdateScheduleState: mocks.resolveAutoUpdateScheduleState,
   resolveSubscriptionAutoUpdateState: mocks.resolveSubscriptionAutoUpdateState,
 }));
-vi.mock("./crypto", () => ({ encryptJson: mocks.encryptJson }));
+vi.mock("./crypto", () => ({
+  encryptJson: mocks.encryptJson,
+  encryptText: (value: string) => value,
+}));
 vi.mock("./prisma", () => ({ prisma: mocks.prisma }));
 vi.mock("./subscription-service", () => ({
   buildSubscriptionCacheExpiry: mocks.buildSubscriptionCacheExpiry,
@@ -105,7 +108,8 @@ describe("local subscription auto update service", () => {
     mocks.prepareRefreshCacheResult.mockReturnValue({
       ok: true,
       refreshedConfig: { rules: [], sources: [{ url: "https://airport.example/sub" }] },
-      cacheEntry: { nodes: [{ name: "A" }], subscriptionInfo: { upload: 1 } },
+      cacheEntry: { nodes: [{ name: "A" }], subscriptionInfo: { upload: 1 }, generatedYaml: "mixed-port: 7890\n" },
+      generatedYaml: "mixed-port: 7890\n",
       nodeCount: 1,
     });
     mocks.resolveAutomaticRefreshCompletionDecision.mockReturnValue({

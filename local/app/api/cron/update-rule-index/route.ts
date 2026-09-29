@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireLocalCronAuth } from "@local/lib/cron-auth";
 import { refreshRuleIndex } from "@local/lib/rule-catalog";
+import { isCloudflareDeployment } from "@local/lib/cloudflare-bindings";
 
 export async function POST(request: NextRequest) {
+  if (isCloudflareDeployment()) return new Response("Not found", { status: 404 });
+
   const authError = requireLocalCronAuth(request);
   if (authError) return authError;
 

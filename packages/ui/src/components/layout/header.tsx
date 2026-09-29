@@ -114,6 +114,7 @@ export function Header({
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
   const { user } = useUserStore();
+  const appLoginEnabled = process.env.NEXT_PUBLIC_SUBBOOST_CLOUDFLARE !== "true";
   const canShowPrivilegedItem = Boolean(privilegedMenuItem && user?.isAdmin && !user.isBanned);
   const navItems = mode === "local" ? localNavItems : defaultNavItems;
   const visibleNavItems = user ? navItems : navItems.filter((i) => !i.authOnly);
@@ -187,7 +188,11 @@ export function Header({
           {/* Right Side Actions */}
           <div className="flex items-center gap-2">
             {/* User Menu */}
-            <UserMenu privilegedMenuItem={privilegedMenuItem} />
+            <UserMenu
+              privilegedMenuItem={privilegedMenuItem}
+              allowLogin={appLoginEnabled}
+              allowLogout={appLoginEnabled}
+            />
 
             {/* Mobile Menu Button */}
             <IconButton
@@ -245,7 +250,7 @@ export function Header({
                   {visiblePrivilegedItem.label}
                 </Link>
               )}
-              {!user && (
+              {!user && appLoginEnabled && (
                 <Link
                   href="/login"
                   onClick={() => {

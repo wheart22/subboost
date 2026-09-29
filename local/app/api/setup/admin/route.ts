@@ -6,8 +6,11 @@ import { prisma } from "@local/lib/prisma";
 import { sessionCookieOptions, signSession, SESSION_COOKIE } from "@local/lib/session";
 import { consumeLocalRateLimit, getTrustedClientRateLimitKey, localRateLimitResponse } from "@local/lib/rate-limit";
 import { validateLocalSetupToken } from "@local/lib/setup-token";
+import { isCloudflareDeployment } from "@local/lib/cloudflare-bindings";
 
 export async function POST(request: Request) {
+  if (isCloudflareDeployment()) return new Response("Not found", { status: 404 });
+
   const clientKey = getTrustedClientRateLimitKey(request);
   if (clientKey) {
     const setupLimit = consumeLocalRateLimit("admin-setup-client", clientKey, {

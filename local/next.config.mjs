@@ -1,9 +1,20 @@
 import path from "node:path";
+import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
+
+initOpenNextCloudflareForDev();
+
+const cloudflareBuild = process.env.SUBBOOST_CLOUDFLARE_BUILD === "1";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: "standalone",
-  outputFileTracingRoot: path.resolve(process.cwd(), ".."),
+  env: {
+    NEXT_PUBLIC_SUBBOOST_CLOUDFLARE: cloudflareBuild ? "true" : "false",
+  },
+  ...(cloudflareBuild ? {} : {
+    output: "standalone",
+    outputFileTracingRoot: path.resolve(process.cwd(), ".."),
+  }),
+  serverExternalPackages: ["@prisma/client", ".prisma/client", "pg"],
   transpilePackages: ["@subboost/core", "@subboost/server-core", "@subboost/ui", "@subboost/config"],
   webpack(config) {
     config.resolve.alias["@"] = path.resolve(process.cwd(), "src");

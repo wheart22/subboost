@@ -31,7 +31,15 @@ export type AccountMenuItem = {
   label: string;
 };
 
-export function UserMenu({ privilegedMenuItem }: { privilegedMenuItem?: AccountMenuItem }) {
+export function UserMenu({
+  privilegedMenuItem,
+  allowLogin = true,
+  allowLogout = true,
+}: {
+  privilegedMenuItem?: AccountMenuItem;
+  allowLogin?: boolean;
+  allowLogout?: boolean;
+}) {
   const { user, isLoading: userLoading, fetchUser, logout: userLogout } = useUserStore();
   const [isOpen, setIsOpen] = React.useState(false);
 
@@ -65,9 +73,12 @@ export function UserMenu({ privilegedMenuItem }: { privilegedMenuItem?: AccountM
   if (!user) {
     return (
       <Button asChild size="sm" className="gap-2">
-        <Link href="/login" onClick={() => captureAuthConfigHandoff(useConfigStore.getState())}>
-          <LogIn className="h-4 w-4" />
-          登录
+        <Link
+          href={allowLogin ? "/login" : "/dashboard"}
+          onClick={allowLogin ? () => captureAuthConfigHandoff(useConfigStore.getState()) : undefined}
+        >
+          {allowLogin ? <LogIn className="h-4 w-4" /> : <LayoutDashboard className="h-4 w-4" />}
+          {allowLogin ? "登录" : "我的订阅"}
         </Link>
       </Button>
     );
@@ -160,14 +171,18 @@ export function UserMenu({ privilegedMenuItem }: { privilegedMenuItem?: AccountM
               </Link>
           </DropdownMenuItem>
         </div>
-        <DropdownMenuSeparator className="m-0 bg-white/10" />
-        <DropdownMenuItem
-          onSelect={() => void handleLogout()}
-          className="rounded-none px-4 py-2 text-red-400 focus:bg-white/5 focus:text-red-300"
-        >
-          <LogOut className="h-4 w-4" />
-          退出登录
-        </DropdownMenuItem>
+        {allowLogout && (
+          <>
+            <DropdownMenuSeparator className="m-0 bg-white/10" />
+            <DropdownMenuItem
+              onSelect={() => void handleLogout()}
+              className="rounded-none px-4 py-2 text-red-400 focus:bg-white/5 focus:text-red-300"
+            >
+              <LogOut className="h-4 w-4" />
+              退出登录
+            </DropdownMenuItem>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

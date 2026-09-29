@@ -13,6 +13,7 @@
   "scripts": {
     "dev": "npm --workspace @subboost/local run dev",
     "build": "npm --workspace @subboost/local run build",
+    "build:cloudflare": "npm --workspace @subboost/local run build:cloudflare",
     "test:unit": "vitest run",
     "test:coverage": "vitest run --config vitest.coverage.ts --coverage",
     "test:core": "vitest run --config vitest.core.config.ts",
@@ -46,8 +47,8 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
     "dotenv": "^17.4.2",
-    "jose": "^6.2.3",
     "js-yaml": "^4.3.2",
+    "jose": "^6.2.3",
     "lucide-react": "^1.17.0",
     "next": "^16.3.4",
     "peggy": "^5.1.0",
@@ -58,6 +59,7 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "^1.20.6",
     "@tailwindcss/postcss": "^4.3.0",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.19.19",
@@ -69,8 +71,10 @@
     "postcss": "8.5.23",
     "prisma": "^7.9.0",
     "tailwindcss": "^4.3.0",
+    "tsx": "^4.23.15",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.11",
+    "wrangler": "^4.143.0"
   },
   "overrides": {
     "deepmerge-ts": "8.0.0",

@@ -66,6 +66,7 @@ vi.mock("@subboost/server-core/subscription", async (importOriginal) => {
 });
 
 vi.mock("./crypto", () => ({
+  encryptText: (value: string) => value,
   encryptJson: (value: unknown) => JSON.stringify(value),
   decryptJson: (value: string | null | undefined, fallback: unknown) => {
     if (!value) return fallback;
@@ -297,6 +298,7 @@ describe("local subscription service", () => {
         nodes: [node()],
         autoUpdateInterval: "3600",
         subscriptionInfo: { upload: 2048, total: 4096 },
+        generatedYaml: "mixed-port: 7890\n",
         config: {
           sources: [{ type: "url", content: "https://example.com/sub" }],
         },
@@ -309,6 +311,9 @@ describe("local subscription service", () => {
         ownerId: "owner-1",
         name: "Created",
         token: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/),
+        encryptedGeneratedYaml: "mixed-port: 7890\n",
+        generatedYamlSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+        generatedYamlUpdatedAt: expect.any(Date),
         encryptedUrls: JSON.stringify(["https://example.com/sub"]),
         encryptedNodes: expect.stringContaining('"name":"Node"'),
         encryptedConfig: expect.stringContaining('"smartNodeMatchingEnabled":false'),
@@ -321,6 +326,7 @@ describe("local subscription service", () => {
     await createSubscription("owner-1", {
       name: "Nodes only",
       nodes: [node("Only")],
+      generatedYaml: "mixed-port: 7890\n",
       autoUpdateInterval: -1,
       config: "ignored",
       subscriptionInfo: "ignored",
@@ -340,6 +346,7 @@ describe("local subscription service", () => {
     await createSubscription("owner-1", {
       name: "Six minutes",
       nodes: [node("Fast")],
+      generatedYaml: "mixed-port: 7890\n",
       autoUpdateInterval: 360,
     });
     expect(mocks.prisma.subscription.create).toHaveBeenLastCalledWith({
@@ -396,6 +403,7 @@ describe("local subscription service", () => {
       createSubscription("owner-1", {
         name: "Provider output",
         nodes: [node("套餐到期提醒")],
+        generatedYaml: "mixed-port: 7890\n",
         config: {
           sources: [
             {

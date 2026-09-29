@@ -336,8 +336,31 @@ export function normalizeRuleSearchType(value: string | null | undefined): RuleS
 export function createRuleCatalogService(options: RuleCatalogServiceOptions = {}) {
   let cachedIndex: RemoteRuleIndex | null = null;
   let indexInflight: Promise<RemoteRuleIndex> | null = null;
+  let cacheLoadPromise: Promise<void> | null = null;
   const discoveryCache = new Map<string, CnRuleCandidateDiscovery>();
   const discoveryInflight = new Map<string, Promise<CnRuleCandidateDiscovery>>();
+
+  async function hydrateCachedIndex(): Promise<void> {
+    if (cachedIndex || !options.loadCachedIndex) return;
+    if (!cacheLoadPromise) {
+      cacheLoadPromise = options.loadCachedIndex()
+        .then((index) => {
+          if (
+            index &&
+            Array.isArray(index.geosite) &&
+            Array.isArray(index.geoip) &&
+            Number.isFinite(index.fetchedAt) &&
+            Number.isFinite(index.expiresAt)
+          ) {
+            cachedIndex = index;
+          }
+        })
+        .catch((error) => {
+          options.logger?.warn?.("Unable to read persisted rule index", error);
+        });
+    }
+    await cacheLoadPromise;
+  }
 
   async function fetchRemoteRuleIndex(): Promise<RemoteRuleIndex> {
     const geoSha = await resolveGeoTreeSha(options);
@@ -358,13 +381,17 @@ export function createRuleCatalogService(options: RuleCatalogServiceOptions = {}
   }
 
   async function refreshIndex(force = false): Promise<RemoteRuleIndex> {
+    await hydrateCachedIndex();
     const now = getNow(options);
     if (!force && cachedIndex && isIndexFresh(cachedIndex, now)) return withSource(cachedIndex, "remote");
     if (indexInflight) return indexInflight;
 
     indexInflight = fetchRemoteRuleIndex()
-      .then((index) => {
+      .then(async (index) => {
         cachedIndex = index;
+        await options.saveCachedIndex?.(index).catch((error) => {
+          options.logger?.warn?.("Unable to persist refreshed rule index", error);
+        });
         return withSource(index, "remote");
       })
       .finally(() => {
@@ -375,8 +402,14 @@ export function createRuleCatalogService(options: RuleCatalogServiceOptions = {}
   }
 
   async function getRemoteRuleIndex(params: { force?: boolean; allowStale?: boolean; now?: number } = {}) {
+    await hydrateCachedIndex();
     const now = params.now ?? getNow(options);
     if (!params.force && cachedIndex && isIndexFresh(cachedIndex, now)) return withSource(cachedIndex, "remote");
+
+    if (!params.force && options.refreshOnRequest === false) {
+      if (cachedIndex && params.allowStale !== false) return withSource(cachedIndex, "stale");
+      throw new RuleIndexUnavailableError("Persisted rule index is not available; wait for the scheduled refresh");
+    }
 
     try {
       return await refreshIndex(params.force ?? false);

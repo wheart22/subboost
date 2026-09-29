@@ -1,7 +1,7 @@
 import { withCurrentAdmin } from "@local/lib/api-auth";
 import { apiError, json, jsonBodyError, LOCAL_JSON_BODY_LIMITS, readJsonBody } from "@local/lib/http";
-import { importSourceUrlDirect } from "@local/lib/source-import";
-import { buildSourceImportParseResult } from "@subboost/server-core/subscription";
+import { fetchPublicSubscriptionText } from "@local/lib/cloudflare-source-import";
+import { isCloudflareDeployment } from "@local/lib/cloudflare-bindings";
 
 function getStringField(body: unknown, key: string): string {
   if (!body || typeof body !== "object" || Array.isArray(body)) return "";
@@ -18,27 +18,62 @@ export async function POST(request: Request) {
       return apiError("Invalid JSON body.", "BAD_REQUEST", 400);
     }
 
-    const result = await importSourceUrlDirect({
-      url: getStringField(body, "url"),
-      userinfoUrl: getStringField(body, "userinfoUrl") || undefined,
-      userinfoUserAgent: getStringField(body, "userinfoUserAgent") || undefined,
-    });
+    const sourceUrl = getStringField(body, "url");
+    let content: string;
+    let headers: Record<string, string>;
+    let parseResult: unknown;
+    let failure: { error: string; status: number; code?: string; errorInfo?: unknown } | null = null;
 
-    if (!result.ok) {
-      return json(
-        {
+    if (isCloudflareDeployment()) {
+      const result = await fetchPublicSubscriptionText(sourceUrl);
+      if (!result.ok) {
+        failure = {
           error: result.error,
+          status: result.status,
+          code: result.status === 400 || result.status === 310 ? "BAD_REQUEST" : "INTERNAL_ERROR",
+        };
+      }
+      content = result.ok ? result.content : "";
+      headers = result.ok ? result.headers : {};
+      const userinfoUrl = getStringField(body, "userinfoUrl");
+      if (!failure && userinfoUrl) {
+        const userinfo = await fetchPublicSubscriptionText(userinfoUrl);
+        if (userinfo.ok) headers = { ...headers, ...userinfo.headers };
+      }
+    } else {
+      const [{ importSourceUrlDirect }, { buildSourceImportParseResult }] = await Promise.all([
+        import("@local/lib/source-import"),
+        import("@subboost/server-core/subscription"),
+      ]);
+      const result = await importSourceUrlDirect({
+        url: sourceUrl,
+        userinfoUrl: getStringField(body, "userinfoUrl") || undefined,
+        userinfoUserAgent: getStringField(body, "userinfoUserAgent") || undefined,
+      });
+      if (!result.ok) {
+        failure = {
+          error: result.error,
+          status: result.responseStatus && result.responseStatus >= 400 ? result.responseStatus : 400,
           code: result.errorInfo.category === "format" ? "BAD_REQUEST" : "INTERNAL_ERROR",
           errorInfo: result.errorInfo,
+        };
+      }
+      content = result.ok ? result.content : "";
+      headers = result.ok ? result.headers : {};
+      if (result.ok) parseResult = buildSourceImportParseResult(result);
+    }
+
+    if (failure) {
+      return json(
+        {
+          error: failure.error,
+          code: failure.code ?? (failure.status === 400 ? "BAD_REQUEST" : "INTERNAL_ERROR"),
+          ...(failure.errorInfo ? { errorInfo: failure.errorInfo } : {}),
         },
-        result.responseStatus && result.responseStatus >= 400 ? result.responseStatus : 400
+        failure.status
       );
     }
 
-    return json({
-      content: result.content,
-      headers: result.headers,
-      parseResult: buildSourceImportParseResult(result),
-    });
+    return json({ content, headers, ...(parseResult ? { parseResult } : {}) });
   });
 }

@@ -37,6 +37,7 @@
 - Online entry: [No deployment required - direct access to the public service](https://subboost.org)
 - Deployment docs: [One-click deployment - pulls an image to build, faster with lower requirements](https://docs.subboost.org/deploy/one-click)
 - Deployment docs: [Advanced deployment - compiles from source, slower with higher requirements](https://docs.subboost.org/deploy/advanced)
+- Personal deployment: [Cloudflare Workers + Neon free-tier guide](./docs/deploy/cloudflare-free-cn.md)
 - Configuration guide: [Clash configuration simple enough for a paramecium: configure precise routing and chained proxies from the UI in one click](https://ryanvan.com/t/topic/59?u=ryan)
 
 ## Development Notes

@@ -312,6 +312,7 @@ export function useSubscriptionLink({
 
       const payload = {
           name: subscriptionName,
+          generatedYaml,
           templateId: appliedTemplateId,
           autoUpdateInterval: nextAutoUpdateInterval,
           urls: storeSources

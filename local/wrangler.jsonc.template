@@ -1,0 +1,31 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "account_id": "__CLOUDFLARE_ACCOUNT_ID__",
+  "name": "subboost-management",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-09-29",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "observability": { "enabled": true },
+  "vars": {
+    "NODE_ENV": "production",
+    "SUBBOOST_CLOUDFLARE": "true",
+    "TRUST_PROXY_HEADERS": "true",
+    "SUBSCRIPTION_BASE_URL": "__SUBSCRIPTION_WORKER_URL__"
+  },
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "__HYPERDRIVE_ID__"
+    }
+  ],
+  "kv_namespaces": [
+    { "binding": "CONFIG_KV", "id": "__CONFIG_KV_NAMESPACE_ID__" },
+    { "binding": "RULES_KV", "id": "__RULES_KV_NAMESPACE_ID__" }
+  ]
+}

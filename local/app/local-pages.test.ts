@@ -163,11 +163,29 @@ describe("local app pages and adapters", () => {
   });
 
   it("connects the dashboard adapter to local subscription routes", async () => {
-    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
-    vi.stubGlobal("fetch", fetchMock);
-    mocks.readJsonResponse.mockResolvedValueOnce({ subscriptions: [{ id: "sub-1" }] }).mockResolvedValueOnce({}).mockResolvedValueOnce({
-      ok: true,
+    const subscriptionDetail = {
+      subscription: {
+        id: "sub-1",
+        name: "Sub",
+        urls: [],
+        nodes: [],
+        config: {
+          sources: [{
+            id: "source-1",
+            type: "yaml",
+            content: "proxies:\n  - name: DIRECT\n    type: direct",
+          }],
+        },
+      },
+    };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
+      if (String(input) === "/api/subscriptions/sub%201") {
+        return new Response(JSON.stringify(subscriptionDetail), { status: 200 });
+      }
+      return new Response("{}", { status: 200 });
     });
+    vi.stubGlobal("fetch", fetchMock);
+    mocks.readJsonResponse.mockResolvedValueOnce({ subscriptions: [{ id: "sub-1" }] }).mockResolvedValueOnce({}).mockResolvedValueOnce({});
 
     renderToStaticMarkup(React.createElement(DashboardPage));
     const adapter = mocks.dashboardAdapter;
@@ -180,7 +198,10 @@ describe("local app pages and adapters", () => {
 
     await expect(adapter.fetchSubscriptions()).resolves.toEqual([{ id: "sub-1" }]);
     await expect(adapter.deleteSubscription("sub 1")).resolves.toBeUndefined();
-    await expect(adapter.refreshSubscription("sub 1")).resolves.toEqual({ ok: true });
+    await expect(adapter.refreshSubscription("sub 1")).resolves.toMatchObject({
+      nodeCount: 1,
+      refreshedStaticSourceCount: 1,
+    });
     await expect(adapter.updateSubscriptionSettings("sub 1", { name: "Sub" })).resolves.toBeUndefined();
     expect(
       adapter.resolveDownloadUrl({
@@ -194,13 +215,23 @@ describe("local app pages and adapters", () => {
       requireIntegerHours: false,
     });
     expect(fetchMock).toHaveBeenCalledWith("/api/subscriptions/sub%201", { method: "DELETE" });
-    expect(fetchMock).toHaveBeenCalledWith("/api/subscriptions/sub%201/refresh", expect.objectContaining({ method: "POST" }));
+    expect(fetchMock).toHaveBeenCalledWith("/api/subscriptions/sub%201", { cache: "no-store" });
     expect(fetchMock).toHaveBeenCalledWith("/api/subscriptions/sub%201", expect.objectContaining({ method: "PUT" }));
+    const saveCall = fetchMock.mock.calls.find(([, init]) => init?.method === "PUT");
+    expect(JSON.parse(String(saveCall?.[1]?.body))).toEqual(expect.objectContaining({
+      generatedYaml: expect.stringContaining("DIRECT"),
+    }));
   });
 
   it("connects the template library adapter to local template routes", async () => {
     const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
+    fetchMock
+      .mockResolvedValueOnce(new Response(JSON.stringify({ templates: [{ id: "tpl-1" }] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response("", { status: 404 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ template: { kind: "yaml", config: {} } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response("{}", { status: 200 }))
+      .mockResolvedValueOnce(new Response("{}", { status: 200 }));
     mocks.readJsonResponse
       .mockResolvedValueOnce({ templates: [{ id: "tpl-1" }] })
       .mockResolvedValueOnce({ template: { kind: "yaml", config: {} } })
@@ -211,9 +242,7 @@ describe("local app pages and adapters", () => {
     const adapter = mocks.templateAdapter;
 
     await expect(adapter.loadTemplates("my")).resolves.toEqual([{ id: "tpl-1" }]);
-    fetchMock.mockResolvedValueOnce(new Response("", { status: 404 }));
     await expect(adapter.loadTemplateDetail("missing")).resolves.toBeNull();
-    fetchMock.mockResolvedValueOnce(new Response("{}", { status: 200 }));
     await expect(adapter.loadTemplateDetail("tpl 1")).resolves.toEqual({ kind: "yaml", config: {} });
     await expect(adapter.uploadTemplate({ name: "Tpl" })).resolves.toBeUndefined();
     await expect(adapter.deleteTemplate("tpl 1")).resolves.toBeUndefined();
